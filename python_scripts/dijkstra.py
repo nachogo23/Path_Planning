@@ -191,18 +191,18 @@ class Config():
 
     def __init__(self):
         # robot parameter
-        self.max_speed = 1.0  # [m/s]
+        self.max_speed = 0.7  # [m/s]
         self.min_speed = -0.5  # [m/s]
         self.max_yawrate = 40.0 * math.pi / 180.0  # [rad/s]
-        self.max_accel = 0.2  # [m/ss]
+        self.max_accel = 0.3  # [m/ss]
         self.max_dyawrate = 40.0 * math.pi / 180.0  # [rad/ss]
         self.v_reso = 0.01  # [m/s]
         self.yawrate_reso = 0.1 * math.pi / 180.0  # [rad/s]
         self.dt = 0.1  # [s]
-        self.predict_time = 3.0  # [s]
-        self.to_goal_cost_gain = 1.0
+        self.predict_time = 1.5  #[s]
+        self.to_goal_cost_gain = 1.5
         self.speed_cost_gain = 1.0
-        self.robot_radius = 3.0  # [m]
+        self.robot_radius = 1.0  # [m]
 
 
 def motion(x, u, dt):
@@ -337,6 +337,7 @@ def plot_arrow(x, y, yaw, length=0.5, width=0.1):
 def main():
     print(__file__ + " start!!")
 
+    follow_dijkstra = True
     # start and goal position
     sx = 1.0  # [m]
     sy = 1.0  # [m]
@@ -351,7 +352,7 @@ def main():
     for i in range(12):
         ox.append(i)
         oy.append(0.0)
-    for i in range(12):
+    for i in range(13):
         ox.append(12.0)
         oy.append(i)
     for i in range(12):
@@ -370,22 +371,21 @@ def main():
         plt.axis("equal")
 
     rx, ry = dijkstra_planning(sx, sy, gx, gy, ox, oy, grid_size, robot_size)
-    print(rx)
-    print(ry)
+
     if show_animation:
-        plt.plot(rx, ry, "-r")
-        plt.show()
+        plt.plot(rx, ry, "-b")
+        #plt.show()
 
 
-"""if __name__ == '__main__':"""
+#"""if __name__ == '__main__':"""
 
 
 
 
 # initial state [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)]
-    x = np.array([-5.0, -5.0, math.pi / 8.0, 0.0, 0.0])
+    x = np.array([1.0, 1.0, math.pi / 8.0, 0.0, 0.0])
 # goal position [x(m), y(m)]
-    goal = np.array([15, 10])
+
 # obstacles [x(m) y(m), ....]
     ob = np.array([[4, 2],
                 [5, 4],
@@ -395,43 +395,115 @@ def main():
                [5, 8],
                [5, 9]])
 
-u = np.array([0.0, 0.0])
-config = Config()
-traj = np.array(x)
+    u = np.array([0.0, 0.0])
+    config = Config()
+    traj = np.array(x)
 
-for i in range(1000):
-    u, ltraj = dwa_control(x, u, config, goal, ob)
 
-    x = motion(x, u, config.dt)
-    traj = np.vstack((traj, x))  # store state history
 
-    # print(traj)
+    if follow_dijkstra:
 
+        #Pasamos como goal la mitad de los puntos de rx y ry recorriendo estos elementos con un bucle
+        for i in range(len(rx)/2):
+
+            goal = np.array([rx[len(rx)-1-i*2], ry[len(ry)-1-i*2]])
+
+            for i in range(1000):
+                u, ltraj = dwa_control(x, u, config, goal, ob)
+
+                x = motion(x, u, config.dt)
+                traj = np.vstack((traj, x))  # store state history
+
+                # print(traj)
+
+                if show_animation:
+                    plt.cla()
+                    plt.plot(ltraj[:, 0], ltraj[:, 1], "-g")
+                    plt.plot(x[0], x[1], "xr")
+                    plt.plot(goal[0], goal[1], "xb")
+                    plt.plot(ob[:, 0], ob[:, 1], "ok")
+                    plt.plot(rx, ry, "-b")
+                    plot_arrow(x[0], x[1], x[2])
+                    plt.axis("equal")
+                    plt.grid(True)
+                    plt.pause(0.0001)
+
+                # check goal
+                if math.sqrt((x[0] - goal[0])**2 + (x[1] - goal[1])**2) <= config.robot_radius:
+                    print("Goal!!")
+                    break
+
+        #Aseguramos que el ultimo punto del path (goal) se pasa al dwa planner, el primer punto de la lista corresponde al ultimo de la trayectoria.
+        goal = np.array([rx[0], ry[0]])
+
+
+        for i in range(1000):
+            u, ltraj = dwa_control(x, u, config, goal, ob)
+
+            x = motion(x, u, config.dt)
+            traj = np.vstack((traj, x))  # store state history
+
+            # print(traj)
+
+            if show_animation:
+                plt.cla()
+                plt.plot(ltraj[:, 0], ltraj[:, 1], "-g")
+                plt.plot(x[0], x[1], "xr")
+                plt.plot(goal[0], goal[1], "xb")
+                plt.plot(ob[:, 0], ob[:, 1], "ok")
+                plt.plot(rx, ry, "-b")
+                plot_arrow(x[0], x[1], x[2])
+                plt.axis("equal")
+                plt.grid(True)
+                plt.pause(0.0001)
+
+            # check goal
+            if math.sqrt((x[0] - goal[0])**2 + (x[1] - goal[1])**2) <= config.robot_radius:
+                print("Goal!!")
+                break
+
+
+
+    else:
+
+        goal = np.array([8, 8])
+
+        for i in range(1000):
+            u, ltraj = dwa_control(x, u, config, goal, ob)
+
+            x = motion(x, u, config.dt)
+            traj = np.vstack((traj, x))  # store state history
+
+            # print(traj)
+
+            if show_animation:
+                plt.cla()
+                plt.plot(ltraj[:, 0], ltraj[:, 1], "-g")
+                plt.plot(x[0], x[1], "xr")
+                plt.plot(goal[0], goal[1], "xb")
+                plt.plot(ob[:, 0], ob[:, 1], "ok")
+                plt.plot(rx, ry, "-b")
+                plot_arrow(x[0], x[1], x[2])
+                plt.axis("equal")
+                plt.grid(True)
+                plt.pause(0.0001)
+
+            # check goal
+            if math.sqrt((x[0] - goal[0])**2 + (x[1] - goal[1])**2) <= config.robot_radius:
+                print("Goal!!")
+                break
+
+
+
+
+    print("Done")
     if show_animation:
-        plt.cla()
-        plt.plot(ltraj[:, 0], ltraj[:, 1], "-g")
-        plt.plot(x[0], x[1], "xr")
-        plt.plot(goal[0], goal[1], "xb")
-        plt.plot(ob[:, 0], ob[:, 1], "ok")
-        plot_arrow(x[0], x[1], x[2])
-        plt.axis("equal")
-        plt.grid(True)
+        plt.plot(traj[:, 0], traj[:, 1], "-r")
         plt.pause(0.0001)
 
-    # check goal
-    if math.sqrt((x[0] - goal[0])**2 + (x[1] - goal[1])**2) <= config.robot_radius:
-        print("Goal!!")
-        break
-
-print("Done")
-if show_animation:
-    plt.plot(traj[:, 0], traj[:, 1], "-r")
-    plt.pause(0.0001)
-
-plt.show()
+    plt.show()
 
 
 if __name__ == '__main__':
-
 
     main()
